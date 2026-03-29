@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { format, addDays } from "date-fns";
-import { Calendar as CalendarIcon, Plus, Trash2, RefreshCw, BookOpen, Clock, AlertCircle, Moon, Sun, Upload, FileText, X, Download, Edit2, Save, ArrowLeft, ExternalLink } from "lucide-react";
+import { Calendar as CalendarIcon, Plus, Trash2, RefreshCw, BookOpen, Clock, AlertCircle, Moon, Sun, Upload, FileText, X, Download, Edit2, Save, ArrowLeft, ExternalLink, ChevronDown, ChevronUp, Link as LinkIcon } from "lucide-react";
 import { GoogleGenAI, Type } from "@google/genai";
 import { motion, AnimatePresence } from "motion/react";
 import { Toaster, toast } from "sonner";
@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { MagicCard, MagicCardContainer } from "@/components/MagicCard";
+import GradientText from "@/components/GradientText";
 
 type Topic = {
   name: string;
@@ -35,6 +36,7 @@ type Topic = {
 type Subject = {
   name: string;
   topics: Topic[];
+  links?: { name: string; url: string }[];
 };
 
 type Task = {
@@ -67,8 +69,9 @@ export default function App() {
   const [examDate, setExamDate] = useState<Date>();
   const [dailyHours, setDailyHours] = useState<number>(4);
   const [subjects, setSubjects] = useState<Subject[]>([
-    { name: "", topics: [{ name: "", difficulty: "medium" }] },
+    { name: "", topics: [{ name: "", difficulty: "medium" }], links: [] },
   ]);
+  const [expandedSubjects, setExpandedSubjects] = useState<number[]>([0]);
   const [loading, setLoading] = useState(false);
   const [studyPlans, setStudyPlans] = useState<StudyPlan[]>([]);
   const [activePlanId, setActivePlanId] = useState<string | null>(null);
@@ -163,17 +166,50 @@ export default function App() {
   };
 
   const addSubject = () => {
-    setSubjects([...subjects, { name: "", topics: [{ name: "", difficulty: "medium" }] }]);
+    setSubjects([...subjects, { name: "", topics: [{ name: "", difficulty: "medium" }], links: [] }]);
+    setExpandedSubjects([...expandedSubjects, subjects.length]);
   };
 
   const removeSubject = (index: number) => {
     setSubjects(subjects.filter((_, i) => i !== index));
+    setExpandedSubjects(expandedSubjects.filter(i => i !== index).map(i => i > index ? i - 1 : i));
   };
 
   const updateSubjectName = (index: number, name: string) => {
     const newSubjects = [...subjects];
     newSubjects[index].name = name;
     setSubjects(newSubjects);
+  };
+
+  const toggleSubjectExpansion = (index: number) => {
+    setExpandedSubjects(prev => 
+      prev.includes(index) ? prev.filter(i => i !== index) : [...prev, index]
+    );
+  };
+
+  const addLink = (subjectIndex: number) => {
+    const newSubjects = [...subjects];
+    if (!newSubjects[subjectIndex].links) {
+      newSubjects[subjectIndex].links = [];
+    }
+    newSubjects[subjectIndex].links.push({ name: "", url: "" });
+    setSubjects(newSubjects);
+  };
+
+  const updateLink = (subjectIndex: number, linkIndex: number, field: "name" | "url", value: string) => {
+    const newSubjects = [...subjects];
+    if (newSubjects[subjectIndex].links && newSubjects[subjectIndex].links[linkIndex]) {
+      newSubjects[subjectIndex].links[linkIndex][field] = value;
+      setSubjects(newSubjects);
+    }
+  };
+
+  const removeLink = (subjectIndex: number, linkIndex: number) => {
+    const newSubjects = [...subjects];
+    if (newSubjects[subjectIndex].links) {
+      newSubjects[subjectIndex].links.splice(linkIndex, 1);
+      setSubjects(newSubjects);
+    }
   };
 
   const addTopic = (subjectIndex: number) => {
@@ -506,7 +542,7 @@ export default function App() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.6 }}
-              className="text-4xl font-bold tracking-tight text-foreground"
+              className="text-4xl md:text-5xl font-heading font-extrabold tracking-tight text-foreground"
             >
               AI Study Planner
             </motion.h1>
@@ -532,11 +568,17 @@ export default function App() {
           <div className="max-w-5xl mx-auto space-y-8">
             <div className="flex justify-between items-start">
               <div className="space-y-2">
-                <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
-                  <span className="bg-gradient-to-r from-[#4285F4] via-[#34A853] to-[#FBBC05] bg-clip-text text-transparent">AI-Based</span> 
+                <h1 className="text-4xl md:text-5xl font-heading font-extrabold tracking-tight text-foreground flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <GradientText
+                    colors={['#4285F4', '#34A853', '#FBBC05', '#EA4335']}
+                    animationSpeed={6}
+                    className="font-heading"
+                  >
+                    AI-Based
+                  </GradientText> 
                   Adaptive Study Planner
                 </h1>
-                <p className="text-muted-foreground">Generate a personalized, adaptive study schedule based on your syllabus and constraints.</p>
+                <p className="text-muted-foreground text-lg">Generate a personalized, adaptive study schedule based on your syllabus and constraints.</p>
               </div>
               <div className="flex items-center gap-2">
                 <Button variant="outline" size="icon" onClick={toggleTheme}>
@@ -616,82 +658,145 @@ export default function App() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
-                {subjects.map((subject, sIdx) => (
-                  <div key={sIdx} className="space-y-4 p-4 border rounded-lg bg-card relative">
-                    {subjects.length > 1 && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="absolute top-2 right-2 h-6 w-6 text-muted-foreground hover:text-destructive"
-                        onClick={() => removeSubject(sIdx)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                    
-                    <div className="space-y-2">
-                      <Label>Subject or Skill Name</Label>
-                      <Input
-                        placeholder="e.g. Mathematics, UI Design, AI Prompting"
-                        value={subject.name}
-                        onChange={(e) => updateSubjectName(sIdx, e.target.value)}
-                      />
+                {subjects.map((subject, sIdx) => {
+                  const isExpanded = expandedSubjects.includes(sIdx);
+                  return (
+                  <div key={sIdx} className="space-y-4 p-4 border rounded-lg bg-card relative transition-all duration-200">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex-1 flex items-center gap-2">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 shrink-0" 
+                          onClick={() => toggleSubjectExpansion(sIdx)}
+                        >
+                          {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        </Button>
+                        <Input
+                          placeholder="e.g. Mathematics, UI Design, AI Prompting"
+                          value={subject.name}
+                          onChange={(e) => updateSubjectName(sIdx, e.target.value)}
+                          className="font-medium text-base h-10"
+                        />
+                      </div>
+                      {subjects.length > 1 && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
+                          onClick={() => removeSubject(sIdx)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
 
-                    <div className="space-y-3">
-                      <Label className="text-xs text-muted-foreground uppercase tracking-wider">Topics / Sub-skills</Label>
-                      {subject.topics.map((topic, tIdx) => (
-                        <div key={tIdx} className="flex flex-col gap-2">
-                          <div className="flex items-center gap-2">
-                            <Input
-                              placeholder="Topic name"
-                              value={topic.name}
-                              onChange={(e) => updateTopic(sIdx, tIdx, "name", e.target.value)}
-                              className="flex-1"
-                            />
-                            {subject.topics.length > 1 && (
+                    {isExpanded && (
+                      <div className="pl-10 space-y-6 pt-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-xs text-muted-foreground uppercase tracking-wider">Topics / Sub-skills</Label>
+                          </div>
+                          {subject.topics.map((topic, tIdx) => (
+                            <div key={tIdx} className="flex flex-col gap-3 p-3 bg-muted/20 rounded-md border border-border/50">
+                              <div className="flex items-center gap-2">
+                                <div className="h-6 w-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-medium shrink-0">
+                                  {tIdx + 1}
+                                </div>
+                                <Input
+                                  placeholder="Topic name"
+                                  value={topic.name}
+                                  onChange={(e) => updateTopic(sIdx, tIdx, "name", e.target.value)}
+                                  className="flex-1 h-8"
+                                />
+                                {subject.topics.length > 1 && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
+                                    onClick={() => removeTopic(sIdx, tIdx)}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
+                              <div className="flex rounded-md shadow-sm w-full pl-8" role="group">
+                                {(["easy", "medium", "hard"] as const).map((level, i) => (
+                                  <button
+                                    key={level}
+                                    type="button"
+                                    onClick={() => updateTopic(sIdx, tIdx, "difficulty", level)}
+                                    className={cn(
+                                      "px-3 py-1 text-xs font-medium border focus:z-10 focus:ring-2 focus:ring-ring outline-none transition-colors flex-1",
+                                      i === 0 ? "rounded-l-md" : "-ml-px",
+                                      i === 2 ? "rounded-r-md" : "",
+                                      topic.difficulty === level 
+                                        ? "bg-primary text-primary-foreground border-primary z-10" 
+                                        : "bg-background text-foreground border-input hover:bg-muted"
+                                    )}
+                                  >
+                                    {level.charAt(0).toUpperCase() + level.slice(1)}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full mt-2 border-dashed"
+                            onClick={() => addTopic(sIdx)}
+                          >
+                            <Plus className="mr-2 h-4 w-4" /> Add Topic
+                          </Button>
+                        </div>
+
+                        <div className="space-y-3 pt-4 border-t">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                              <LinkIcon className="h-3 w-3" /> External Resources
+                            </Label>
+                          </div>
+                          {subject.links?.map((link, lIdx) => (
+                            <div key={lIdx} className="flex items-center gap-2 p-2 bg-muted/20 rounded-md border border-border/50">
+                              <div className="h-6 w-6 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0">
+                                <LinkIcon className="h-3 w-3" />
+                              </div>
+                              <Input
+                                placeholder="Resource Name"
+                                value={link.name}
+                                onChange={(e) => updateLink(sIdx, lIdx, "name", e.target.value)}
+                                className="w-1/3 h-8 text-sm"
+                              />
+                              <Input
+                                placeholder="https://..."
+                                value={link.url}
+                                onChange={(e) => updateLink(sIdx, lIdx, "url", e.target.value)}
+                                className="flex-1 h-8 text-sm"
+                              />
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-10 w-10 text-muted-foreground hover:text-destructive shrink-0"
-                                onClick={() => removeTopic(sIdx, tIdx)}
+                                className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
+                                onClick={() => removeLink(sIdx, lIdx)}
                               >
-                                <Trash2 className="h-4 w-4" />
+                                <X className="h-4 w-4" />
                               </Button>
-                            )}
-                          </div>
-                          <div className="flex rounded-md shadow-sm w-full" role="group">
-                            {(["easy", "medium", "hard"] as const).map((level, i) => (
-                              <button
-                                key={level}
-                                type="button"
-                                onClick={() => updateTopic(sIdx, tIdx, "difficulty", level)}
-                                className={cn(
-                                  "px-3 py-1.5 text-xs font-medium border focus:z-10 focus:ring-2 focus:ring-ring outline-none transition-colors flex-1",
-                                  i === 0 ? "rounded-l-md" : "-ml-px",
-                                  i === 2 ? "rounded-r-md" : "",
-                                  topic.difficulty === level 
-                                    ? "bg-primary text-primary-foreground border-primary z-10" 
-                                    : "bg-background text-foreground border-input hover:bg-muted"
-                                )}
-                              >
-                                {level.charAt(0).toUpperCase() + level.slice(1)}
-                              </button>
-                            ))}
-                          </div>
+                            </div>
+                          ))}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full mt-2 border-dashed"
+                            onClick={() => addLink(sIdx)}
+                          >
+                            <Plus className="mr-2 h-4 w-4" /> Add Resource Link
+                          </Button>
                         </div>
-                      ))}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full mt-2"
-                        onClick={() => addTopic(sIdx)}
-                      >
-                        <Plus className="mr-2 h-4 w-4" /> Add Topic
-                      </Button>
-                    </div>
+                      </div>
+                    )}
                   </div>
-                ))}
+                )})}
 
                 <Button variant="secondary" className="w-full" onClick={addSubject}>
                   <Plus className="mr-2 h-4 w-4" /> Add Subject
@@ -953,6 +1058,7 @@ function TaskRow({
   deleteTask: (d: number, t: number) => void;
 }) {
   const [isEditing, setIsEditing] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -977,10 +1083,10 @@ function TaskRow({
         <Checkbox 
           checked={!!task.completed} 
           onCheckedChange={() => toggleTaskCompletion(dayIndex, taskIndex)} 
-          className="no-print"
+          className="no-print mt-1"
         />
         <div className={cn(
-          "w-2 h-8 rounded-full shrink-0",
+          "w-2 h-8 rounded-full shrink-0 mt-1",
           task.type === "revision" ? "bg-purple-400" : "bg-blue-400"
         )} />
       </div>
@@ -1033,8 +1139,11 @@ function TaskRow({
             </div>
           </div>
         ) : (
-          <>
-            <div className="flex flex-wrap items-center gap-2">
+          <div 
+            className="cursor-pointer group" 
+            onClick={() => setIsExpanded(!isExpanded)}
+          >
+            <div className="flex flex-wrap items-center gap-2 mb-1">
               <span className={cn("font-semibold text-foreground", task.completed && "line-through")}>{task.subject}</span>
               <span className={cn(
                 "text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full flex items-center gap-1",
@@ -1051,32 +1160,48 @@ function TaskRow({
               )}>
                 {task.priority || "medium"}
               </span>
+              <Button variant="ghost" size="icon" className="h-6 w-6 ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
+                {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </Button>
             </div>
             <p className={cn("text-muted-foreground text-sm font-medium", task.completed && "line-through")}>{task.topic}</p>
-            {task.description && (
-              <p className={cn("text-muted-foreground/80 text-xs leading-relaxed mt-0.5", task.completed && "opacity-50 line-through")}>
-                {task.description}
-              </p>
-            )}
-            {task.referenceUrl && (
-              <a 
-                href={task.referenceUrl} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className={cn(
-                  "inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 mt-1 hover:underline",
-                  task.completed && "opacity-50"
+            
+            {isExpanded && (
+              <div className="mt-3 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                {task.description && (
+                  <div className="bg-muted/50 p-3 rounded-md">
+                    <p className={cn("text-sm leading-relaxed", task.completed && "opacity-50 line-through")}>
+                      {task.description}
+                    </p>
+                  </div>
                 )}
-              >
-                <ExternalLink className="h-3 w-3" />
-                {task.referenceName || "Study Resource"}
-              </a>
+                
+                {task.referenceUrl && (
+                  <div className="flex items-center gap-2">
+                    <LinkIcon className="h-4 w-4 text-muted-foreground" />
+                    <a 
+                      href={task.referenceUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className={cn(
+                        "inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 hover:underline",
+                        task.completed && "opacity-50"
+                      )}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {task.referenceName || task.referenceUrl}
+                      <ExternalLink className="h-3 w-3 ml-1" />
+                    </a>
+                  </div>
+                )}
+              </div>
             )}
-          </>
+          </div>
         )}
 
-        {showNotes && (
-          <div className="mt-2">
+        {(showNotes || (isExpanded && task.notes)) && (
+          <div className="mt-3">
+            <Label className="text-xs text-muted-foreground mb-1 block">Notes</Label>
             <Textarea 
               placeholder="Add your notes here..." 
               value={task.notes || ""} 
@@ -1086,15 +1211,15 @@ function TaskRow({
           </div>
         )}
         
-        <div className="flex gap-2 pt-1 no-print">
-          <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-muted-foreground" onClick={() => setShowNotes(!showNotes)}>
-            <FileText className="h-3 w-3 mr-1" /> {showNotes ? "Hide Notes" : "Notes"}
+        <div className="flex gap-2 pt-2 no-print border-t mt-3 border-border/50">
+          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-muted-foreground" onClick={() => setShowNotes(!showNotes)}>
+            <FileText className="h-3 w-3 mr-1" /> {showNotes ? "Hide Notes" : "Add Notes"}
           </Button>
           <Button 
             variant="ghost" 
             size="sm" 
             className={cn(
-              "h-6 px-2 text-xs transition-all duration-200",
+              "h-7 px-2 text-xs transition-all duration-200",
               isEditing ? "text-primary font-bold" : "text-muted-foreground"
             )} 
             onClick={() => isEditing ? handleSave() : setIsEditing(true)}
@@ -1105,7 +1230,7 @@ function TaskRow({
 
           <Dialog open={isDeleting} onOpenChange={setIsDeleting}>
             <DialogTrigger render={
-              <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-muted-foreground hover:text-destructive">
+              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive ml-auto">
                 <Trash2 className="h-3 w-3 mr-1" /> Delete
               </Button>
             } />
