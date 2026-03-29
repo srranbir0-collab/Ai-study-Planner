@@ -27,6 +27,8 @@ import {
 import { cn } from "@/lib/utils";
 import { MagicCard, MagicCardContainer } from "@/components/MagicCard";
 import GradientText from "@/components/GradientText";
+import Silk from "@/components/Silk";
+import ScrollVelocity from "@/components/ScrollVelocity";
 
 type Topic = {
   name: string;
@@ -55,6 +57,7 @@ type Task = {
 type DayPlan = {
   date: string;
   tasks: Task[];
+  isDayOff?: boolean;
 };
 
 type StudyPlan = {
@@ -431,10 +434,12 @@ export default function App() {
     const toDayIndex = newPlan.plan.findIndex(day => day.date === toDate);
     if (toDayIndex !== -1) {
       newPlan.plan[toDayIndex].tasks.push(taskToMove);
+      newPlan.plan[toDayIndex].isDayOff = false;
     } else {
       newPlan.plan.push({
         date: toDate,
-        tasks: [taskToMove]
+        tasks: [taskToMove],
+        isDayOff: false
       });
       newPlan.plan.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     }
@@ -475,27 +480,55 @@ export default function App() {
     toast.success("Task deleted successfully");
   };
 
-  const takeDayOff = (dayIndex: number) => {
+  const toggleDayOff = (dayIndex: number) => {
     if (!activePlan) return;
     const newPlan = { ...activePlan };
     const newDays = newPlan.plan.map(day => ({ ...day, tasks: [...day.tasks] }));
     
-    // Add a new day at the end
-    const lastDate = new Date(newDays[newDays.length - 1].date);
-    const newDate = format(addDays(lastDate, 1), "yyyy-MM-dd");
-    newDays.push({ date: newDate, tasks: [] });
+    // Toggle the off status
+    newDays[dayIndex].isDayOff = !newDays[dayIndex].isDayOff;
     
-    // Shift tasks forward
-    for (let i = newDays.length - 1; i > dayIndex; i--) {
-      newDays[i].tasks = [...newDays[i - 1].tasks];
+    // Collect all tasks from dayIndex onwards
+    const tasksToRedistribute: Task[][] = [];
+    for (let i = dayIndex; i < newDays.length; i++) {
+      if (newDays[i].tasks.length > 0) {
+        tasksToRedistribute.push(newDays[i].tasks);
+      }
+      newDays[i].tasks = [];
     }
     
-    // Empty the current day
-    newDays[dayIndex].tasks = [];
+    // Redistribute
+    let currentDayIndex = dayIndex;
+    let taskBlockIndex = 0;
+    
+    while (taskBlockIndex < tasksToRedistribute.length) {
+      if (currentDayIndex >= newDays.length) {
+        // Add a new day
+        const lastDate = new Date(newDays[newDays.length - 1].date);
+        const newDate = format(addDays(lastDate, 1), "yyyy-MM-dd");
+        newDays.push({ date: newDate, tasks: [], isDayOff: false });
+      }
+      
+      if (!newDays[currentDayIndex].isDayOff) {
+        newDays[currentDayIndex].tasks = tasksToRedistribute[taskBlockIndex];
+        taskBlockIndex++;
+      }
+      currentDayIndex++;
+    }
+    
+    // Clean up trailing empty days that are not marked as off
+    while (newDays.length > 1 && newDays[newDays.length - 1].tasks.length === 0 && !newDays[newDays.length - 1].isDayOff) {
+      newDays.pop();
+    }
     
     newPlan.plan = newDays;
     updateActivePlan(newPlan);
-    toast.success("Day marked as off. Tasks shifted to subsequent days.");
+    
+    if (newDays[dayIndex].isDayOff) {
+      toast.success("Day marked as off. Tasks shifted to subsequent days.");
+    } else {
+      toast.success("Day restored. Tasks shifted back.");
+    }
   };
 
   const exportPDF = () => {
@@ -563,14 +596,17 @@ export default function App() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: "easeOut" }}
-          className="min-h-screen bg-background text-foreground p-4 md:p-8 font-sans transition-colors duration-200"
+          className="min-h-screen bg-transparent text-foreground p-4 md:p-8 font-sans transition-colors duration-200 relative"
         >
-          <div className="max-w-5xl mx-auto space-y-8">
+          <div className="fixed inset-0 z-[-1] opacity-30 dark:opacity-20 pointer-events-none">
+            <Silk color={theme === 'dark' ? '#1a1a2e' : '#e0e5ec'} />
+          </div>
+          <div className="max-w-5xl mx-auto space-y-8 relative z-10">
             <div className="flex justify-between items-start">
               <div className="space-y-2">
                 <h1 className="text-4xl md:text-5xl font-heading font-extrabold tracking-tight text-foreground flex flex-wrap items-center gap-x-3 gap-y-1">
                   <GradientText
-                    colors={['#4285F4', '#34A853', '#FBBC05', '#EA4335']}
+                    colors={['#4285F4', '#0F9D58', '#F4B400', '#DB4437']}
                     animationSpeed={6}
                     className="font-heading"
                   >
@@ -720,24 +756,41 @@ export default function App() {
                                   </Button>
                                 )}
                               </div>
-                              <div className="flex rounded-md shadow-sm w-full pl-8" role="group">
-                                {(["easy", "medium", "hard"] as const).map((level, i) => (
-                                  <button
-                                    key={level}
-                                    type="button"
-                                    onClick={() => updateTopic(sIdx, tIdx, "difficulty", level)}
-                                    className={cn(
-                                      "px-3 py-1 text-xs font-medium border focus:z-10 focus:ring-2 focus:ring-ring outline-none transition-colors flex-1",
-                                      i === 0 ? "rounded-l-md" : "-ml-px",
-                                      i === 2 ? "rounded-r-md" : "",
-                                      topic.difficulty === level 
-                                        ? "bg-primary text-primary-foreground border-primary z-10" 
-                                        : "bg-background text-foreground border-input hover:bg-muted"
-                                    )}
-                                  >
-                                    {level.charAt(0).toUpperCase() + level.slice(1)}
-                                  </button>
-                                ))}
+                              <div className="w-full pl-8">
+                                <div className="flex rounded-md shadow-sm w-full" role="group">
+                                  {(["easy", "medium", "hard"] as const).map((level, i) => (
+                                    <button
+                                      key={level}
+                                      type="button"
+                                      onClick={() => updateTopic(sIdx, tIdx, "difficulty", level)}
+                                      className={cn(
+                                        "px-3 py-1 text-xs font-medium border outline-none transition-colors flex-1 relative",
+                                        i === 0 ? "rounded-l-md" : "-ml-px",
+                                        i === 2 ? "rounded-r-md" : "",
+                                        topic.difficulty === level 
+                                          ? cn(
+                                              "text-white z-10",
+                                              level === "easy" && "bg-[#0F9D58] border-[#0F9D58]",
+                                              level === "medium" && "bg-[#4285F4] border-[#4285F4]",
+                                              level === "hard" && "bg-[#DB4437] border-[#DB4437]"
+                                            )
+                                          : cn(
+                                              "bg-background border-input hover:bg-muted z-0",
+                                              level === "easy" && "text-[#0F9D58]",
+                                              level === "medium" && "text-[#4285F4]",
+                                              level === "hard" && "text-[#DB4437]"
+                                            )
+                                      )}
+                                    >
+                                      <span 
+                                        className={cn(topic.difficulty === level && "glitch-text")} 
+                                        data-text={level.charAt(0).toUpperCase() + level.slice(1)}
+                                      >
+                                        {level.charAt(0).toUpperCase() + level.slice(1)}
+                                      </span>
+                                    </button>
+                                  ))}
+                                </div>
                               </div>
                             </div>
                           ))}
@@ -926,17 +979,26 @@ export default function App() {
                               {format(new Date(day.date), "EEEE, MMMM d, yyyy")}
                             </div>
                             <div className="text-xs text-muted-foreground mt-0.5">
-                              {totalCount > 0 ? `${completedCount} / ${totalCount} tasks completed` : "No tasks"}
+                              {day.isDayOff 
+                                ? "Day Off" 
+                                : totalCount > 0 
+                                  ? `${completedCount} / ${totalCount} tasks completed` 
+                                  : "No tasks"}
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="text-muted-foreground hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-500/10 h-8 self-start sm:self-auto no-print"
-                              onClick={() => takeDayOff(i)}
+                              className={cn(
+                                "h-8 self-start sm:self-auto no-print",
+                                day.isDayOff 
+                                  ? "text-blue-600 dark:text-blue-400 bg-blue-500/10 hover:bg-blue-500/20" 
+                                  : "text-muted-foreground hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-500/10"
+                              )}
+                              onClick={() => toggleDayOff(i)}
                             >
-                              Take Day Off
+                              {day.isDayOff ? "Restore Day" : "Take Day Off"}
                             </Button>
                             <Button
                               variant="ghost"
@@ -949,26 +1011,36 @@ export default function App() {
                           </div>
                         </div>
                         <div className="divide-y">
-                          {day.tasks.map((task, j) => (
-                            <TaskRow
-                              key={j}
-                              task={task}
-                              dayIndex={i}
-                              taskIndex={j}
-                              planDates={planDates}
-                              currentDate={day.date}
-                              toggleTaskCompletion={toggleTaskCompletion}
-                              updateTaskDuration={updateTaskDuration}
-                              updateTaskPriority={updateTaskPriority}
-                              moveTask={moveTask}
-                              updateTaskField={updateTaskField}
-                              deleteTask={deleteTask}
-                            />
-                          ))}
-                          {day.tasks.length === 0 && (
-                            <div className="p-6 text-center text-muted-foreground text-sm italic">
-                              Rest day or no tasks scheduled.
+                          {day.isDayOff ? (
+                            <div className="p-8 text-center text-muted-foreground flex flex-col items-center justify-center">
+                              <Moon className="h-8 w-8 mb-2 opacity-50" />
+                              <p>You've marked this day as a day off.</p>
+                              <p className="text-sm opacity-70">Take a break and recharge!</p>
                             </div>
+                          ) : (
+                            <>
+                              {day.tasks.map((task, j) => (
+                                <TaskRow
+                                  key={j}
+                                  task={task}
+                                  dayIndex={i}
+                                  taskIndex={j}
+                                  planDates={planDates}
+                                  currentDate={day.date}
+                                  toggleTaskCompletion={toggleTaskCompletion}
+                                  updateTaskDuration={updateTaskDuration}
+                                  updateTaskPriority={updateTaskPriority}
+                                  moveTask={moveTask}
+                                  updateTaskField={updateTaskField}
+                                  deleteTask={deleteTask}
+                                />
+                              ))}
+                              {day.tasks.length === 0 && (
+                                <div className="p-6 text-center text-muted-foreground text-sm italic">
+                                  Rest day or no tasks scheduled.
+                                </div>
+                              )}
+                            </>
                           )}
                         </div>
                       </MagicCard>
@@ -1026,6 +1098,17 @@ export default function App() {
       </div>
       </motion.div>
       )}
+      
+      {!showSplash && (
+        <div className="mt-12 pb-8">
+          <ScrollVelocity
+            texts={['MADE BY TEAM 07 GDG ITER', 'SMART STUDY PLANNER']}
+            velocity={50}
+            className="text-4xl sm:text-6xl font-bold text-muted-foreground/20 dark:text-muted-foreground/10"
+          />
+        </div>
+      )}
+      
       <Toaster />
     </>
   );
