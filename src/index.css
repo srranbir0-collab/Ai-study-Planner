@@ -1,0 +1,156 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/geist";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+    --font-heading: var(--font-sans);
+    --font-sans: 'Geist Variable', sans-serif;
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar: var(--sidebar);
+    --color-chart-5: var(--chart-5);
+    --color-chart-4: var(--chart-4);
+    --color-chart-3: var(--chart-3);
+    --color-chart-2: var(--chart-2);
+    --color-chart-1: var(--chart-1);
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+    --radius-sm: calc(var(--radius) * 0.6);
+    --radius-md: calc(var(--radius) * 0.8);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.4);
+    --radius-2xl: calc(var(--radius) * 1.8);
+    --radius-3xl: calc(var(--radius) * 2.2);
+    --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+    --background: #ffffff;
+    --foreground: #202124;
+    --card: #ffffff;
+    --card-foreground: #202124;
+    --popover: #ffffff;
+    --popover-foreground: #202124;
+    --primary: #4285F4;
+    --primary-foreground: #ffffff;
+    --secondary: #f1f3f4;
+    --secondary-foreground: #202124;
+    --muted: #f1f3f4;
+    --muted-foreground: #5f6368;
+    --accent: #e8f0fe;
+    --accent-foreground: #1967d2;
+    --destructive: #EA4335;
+    --destructive-foreground: #ffffff;
+    --border: #dadce0;
+    --input: #dadce0;
+    --ring: #4285F4;
+    --chart-1: #4285F4;
+    --chart-2: #34A853;
+    --chart-3: #FBBC05;
+    --chart-4: #EA4335;
+    --chart-5: #8AB4F8;
+    --radius: 0.75rem;
+    --sidebar: #f8f9fa;
+    --sidebar-foreground: #202124;
+    --sidebar-primary: #4285F4;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #f1f3f4;
+    --sidebar-accent-foreground: #202124;
+    --sidebar-border: #dadce0;
+    --sidebar-ring: #4285F4;
+}
+
+.dark {
+    --background: #202124;
+    --foreground: #e8eaed;
+    --card: #292a2d;
+    --card-foreground: #e8eaed;
+    --popover: #292a2d;
+    --popover-foreground: #e8eaed;
+    --primary: #8AB4F8;
+    --primary-foreground: #202124;
+    --secondary: #3c4043;
+    --secondary-foreground: #e8eaed;
+    --muted: #3c4043;
+    --muted-foreground: #9aa0a6;
+    --accent: #3c4043;
+    --accent-foreground: #e8eaed;
+    --destructive: #f28b82;
+    --destructive-foreground: #202124;
+    --border: #5f6368;
+    --input: #5f6368;
+    --ring: #8AB4F8;
+    --chart-1: #8AB4F8;
+    --chart-2: #81C995;
+    --chart-3: #FDE293;
+    --chart-4: #F28B82;
+    --chart-5: #4285F4;
+    --sidebar: #202124;
+    --sidebar-foreground: #e8eaed;
+    --sidebar-primary: #8AB4F8;
+    --sidebar-primary-foreground: #202124;
+    --sidebar-accent: #3c4043;
+    --sidebar-accent-foreground: #e8eaed;
+    --sidebar-border: #5f6368;
+    --sidebar-ring: #8AB4F8;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    }
+  body {
+    @apply bg-background text-foreground;
+    }
+  html {
+    @apply font-sans;
+    }
+}
+
+@media print {
+  @page {
+    margin: 0;
+  }
+  body {
+    margin: 1cm;
+  }
+  body * {
+    visibility: hidden;
+  }
+  #study-plan-content, #study-plan-content * {
+    visibility: visible;
+  }
+  #study-plan-content {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
